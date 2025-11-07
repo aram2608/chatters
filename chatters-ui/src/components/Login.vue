@@ -12,13 +12,16 @@ async function createUser(){
 }
 
 async function login(){
-  const res = await api.post('/login', { username: username.value, password: password.value })
-  const user = res.data.user
-  if (!user) return alert('login failed')
-  localStorage.setItem('user_id', user.ID)
-  localStorage.setItem('username', user.username)
-  alert('logged in')
-  location.reload()
+  try {
+    const res = await api.post('/login', { username: username.value, password: password.value })
+    const user = res.data.user
+    localStorage.setItem('user_id', user.id)
+    localStorage.setItem('username', user.username)
+    alert('logged in')
+    location.reload()
+  } catch (error) {
+    return alert('login failed')
+  }
 }
 </script>
 

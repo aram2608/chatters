@@ -8,7 +8,18 @@ const newName = ref('')
 
 async function load(){
   const res = await api.get('/channels')
-  channels.value = res.channels
+  channels.value = res.data.channels
+
+  // console.log("API Response (res):", res) 
+  
+  // console.log("Channels array to assign:", res.channels) 
+
+  // if (res.data.channels && Array.isArray(res.data.channels)) {
+  //   channels.value = res.data.channels
+  //   console.log("Channels ref value after assignment:", channels.value) 
+  // } else {
+  //   console.error("API response did not contain a valid channels array:", res)
+  // }
 }
 
 async function createChannel(){

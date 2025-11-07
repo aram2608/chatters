@@ -1,3 +1,9 @@
+<script setup>
+import Login from './components/Login.vue'
+import Channels from './components/Channels.vue'
+import Messages from './components/Messages.vue'
+</script>
+
 <template>
   <div>
     <Login />
@@ -7,9 +13,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import Login from './components/Login.vue'
-import Channels from './components/Channels.vue'
-import Messages from './components/Messages.vue'
-</script>

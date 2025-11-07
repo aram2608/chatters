@@ -12,7 +12,7 @@ async function loadMessages(cid){
   if (!cid) return
   channelId.value = cid
   const res = await api.get(`/messages?channel_id=${cid}`)
-  messages.value = res.messages
+  messages.value = res.data.messages
 }
 
 async function send(){
