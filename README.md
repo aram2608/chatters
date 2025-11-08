@@ -1,2 +1,2 @@
 # chatters
-Toy webapp to practice Go and React
+Toy webapp to practice Go and Vue
