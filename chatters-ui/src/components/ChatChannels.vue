@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import api from '../lib/api'
+import api from '@/lib/api'
 
 const channels = ref([])
 const selected = ref(null)

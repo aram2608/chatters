@@ -1,10 +1,13 @@
 package controllers
 
 import (
+	"chatters-REST/config"
 	"chatters-REST/models"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -29,25 +32,31 @@ type CreateMessageInput struct {
 	Text      string `json:"text" binding:"required"`
 }
 
+type Claims struct {
+	UserID   uint   `json:"user_id"`
+	Username string `json:"username"`
+	jwt.RegisteredClaims
+}
+
 // Function used to create an admin
-func CreateAdmin(ctx *gin.Context) {
+func CreateAdmin(c *gin.Context) {
 	// We create an input and attempt to bind the JSON body
 	var in CreateAdminInput
-	if err := ctx.ShouldBindJSON(&in); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// We make sure the entries are not empty
 	if in.Username == "" || in.Password == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "username and password required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "username and password required"})
 		return
 	}
 
 	// We encrypt the password since thats safer right?
 	hashed, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
 		return
 	}
 	in.Password = string(hashed)
@@ -63,28 +72,28 @@ func CreateAdmin(ctx *gin.Context) {
 
 	// We can now return out the proper JSON, we don't return the password
 	in.Password = ""
-	ctx.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
 // Function used to create a new user
-func CreateUser(ctx *gin.Context) {
+func CreateUser(c *gin.Context) {
 	// We create an input and attempt to bind the JSON body
 	var in CreateUserInput
-	if err := ctx.ShouldBindJSON(&in); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	// We make sure the entries are not empty
 	if in.Username == "" || in.Password == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "username and password required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "username and password required"})
 		return
 	}
 
 	// We encrypt the password since thats safer right?
 	hashed, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
 		return
 	}
 	in.Password = string(hashed)
@@ -100,41 +109,65 @@ func CreateUser(ctx *gin.Context) {
 
 	// We can now return out the proper JSON, we don't return the password
 	in.Password = ""
-	ctx.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
 // Function to login a user that has an account
-func Login(ctx *gin.Context) {
+func Login(c *gin.Context) {
 	// We create a credential from our user input and bind the JSON body
 	var cred CreateUserInput
-	if err := ctx.BindJSON(&cred); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
+	if err := c.BindJSON(&cred); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
 		return
 	}
 
 	// We now try to find our user
 	var user models.User
 	if err := models.DB.Where("username = ?", cred.Username).First(&user).Error; err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 	// We now try to compare the password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(cred.Password)); err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		return
+	}
+
+	expiration := time.Now().Add(24 * time.Hour)
+	claims := &Claims{
+		UserID:   user.ID,
+		Username: user.Username,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expiration),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Subject:   "auth",
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString(config.JwtSecret)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create token"})
 		return
 	}
 
 	// We return out the user without the password
 	user.Password = ""
-	ctx.JSON(http.StatusOK, gin.H{"user": user})
+	c.JSON(http.StatusOK, gin.H{
+		"user":  user,
+		"token": signed,
+	})
+
+	// Cookie instead
+	// c.SetCookie("auth_token", signed, 3600*24, "/", "domain-example.com", true, true)
 }
 
 // Function to create a channel
-func CreateChannel(ctx *gin.Context) {
+func CreateChannel(c *gin.Context) {
 	// We create an input and attempt to bind the JSON body
 	var in CreateChannelInput
-	if err := ctx.ShouldBindJSON(&in); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -145,15 +178,15 @@ func CreateChannel(ctx *gin.Context) {
 	models.DB.Create(&channel)
 
 	// We return out the JSON
-	ctx.JSON(http.StatusOK, gin.H{"channel": channel})
+	c.JSON(http.StatusOK, gin.H{"channel": channel})
 }
 
 // Function to create a message
-func CreateMessage(ctx *gin.Context) {
+func CreateMessage(c *gin.Context) {
 	// We create an input and attempt to bind the JSON body
 	var in CreateMessageInput
-	if err := ctx.ShouldBindJSON(&in); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -169,11 +202,11 @@ func CreateMessage(ctx *gin.Context) {
 	models.DB.Create(&message)
 
 	// We return out the corresponding JSON
-	ctx.JSON(http.StatusOK, gin.H{"message": message})
+	c.JSON(http.StatusOK, gin.H{"message": message})
 }
 
 // Function to get our channel names for the front end
-func GetChannels(ctx *gin.Context) {
+func GetChannels(c *gin.Context) {
 	// We create a slice of Channels
 	var channels []models.Channel
 
@@ -181,29 +214,29 @@ func GetChannels(ctx *gin.Context) {
 	models.DB.Find(&channels)
 
 	// We then return out the JSON
-	ctx.JSON(http.StatusOK, gin.H{"channels": channels})
+	c.JSON(http.StatusOK, gin.H{"channels": channels})
 }
 
 // Function to get the channel messages for the front end
-func GetChannelMessages(ctx *gin.Context) {
+func GetChannelMessages(c *gin.Context) {
 	// We query the id
 	// .GET("/users/:id")
-	id := ctx.Param("id")
+	id := c.Param("id")
 
 	// We create a slice of messages
 	var messages []models.Message
 	// We need to query given our ID, we order by ascending order then find
 	// our messages
 	if err := models.DB.Where("channel_id = ?", id).Order("id ASC").Find(&messages).Error; err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	// We can now return our messages
-	ctx.JSON(http.StatusOK, gin.H{"messages": messages})
+	c.JSON(http.StatusOK, gin.H{"messages": messages})
 }
 
 // Function to get our messages for our front end
-func GetMessages(ctx *gin.Context) {
+func GetMessages(c *gin.Context) {
 	// We create a slice of Messages
 	var messages []models.Message
 
@@ -211,11 +244,11 @@ func GetMessages(ctx *gin.Context) {
 	models.DB.Find(&messages)
 
 	// We return out the proper JSON
-	ctx.JSON(http.StatusOK, gin.H{"messages": messages})
+	c.JSON(http.StatusOK, gin.H{"messages": messages})
 }
 
 // Function to get our users for the admin page
-func GetUsers(ctx *gin.Context) {
+func GetUsers(c *gin.Context) {
 	// We create a slice of users
 	var users []models.User
 
@@ -223,5 +256,5 @@ func GetUsers(ctx *gin.Context) {
 	models.DB.Find(&users)
 
 	// We return out the proper JSON
-	ctx.JSON(http.StatusOK, gin.H{"users": users})
+	c.JSON(http.StatusOK, gin.H{"users": users})
 }

@@ -1,3 +1,12 @@
+<script setup>
+import { useAuthStore } from '@/stores/counter'
+const auth = useAuthStore()
+
+function handleLogout() {
+  auth.logout()
+}
+</script>
+
 <template>
   <div id="app">
     <header class="site-header">
@@ -5,6 +14,9 @@
         <router-link to="/">Home</router-link>
         <router-link to="/login">Login</router-link>
       </nav>
+      <div class="header">
+        <button @click="handleLogout">Logout</button>
+      </div>
     </header>
 
     <main>
