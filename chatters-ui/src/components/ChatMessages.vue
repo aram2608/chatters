@@ -11,7 +11,7 @@ const user_id = Number(localStorage.getItem('user_id'))
 async function loadMessages(cid){
   if (!cid) return
   channelId.value = cid
-  const res = await api.get(`/messages?channel_id=${cid}`)
+  const res = await api.get(`/channels/${cid}/messages`)
   messages.value = res.data.messages
 }
 
@@ -27,7 +27,7 @@ window.addEventListener('channel-selected', (e) => { loadMessages(e.detail) })
 
 onMounted(() => {
 })
-</script>
+</script> 
 
 <template>
   <div class="p-4">

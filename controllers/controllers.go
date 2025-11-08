@@ -8,6 +8,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type CreateAdminInput struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
 type CreateUserInput struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
@@ -24,6 +29,44 @@ type CreateMessageInput struct {
 	Text      string `json:"text" binding:"required"`
 }
 
+// Function used to create an admin
+func CreateAdmin(ctx *gin.Context) {
+	// We create an input and attempt to bind the JSON body
+	var in CreateAdminInput
+	if err := ctx.ShouldBindJSON(&in); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// We make sure the entries are not empty
+	if in.Username == "" || in.Password == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "username and password required"})
+		return
+	}
+
+	// We encrypt the password since thats safer right?
+	hashed, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+		return
+	}
+	in.Password = string(hashed)
+
+	// We create the new user
+	user := models.User{
+		Username: in.Username,
+		Password: in.Password,
+	}
+
+	// We add the user to the DB
+	models.DB.Create(&user)
+
+	// We can now return out the proper JSON, we don't return the password
+	in.Password = ""
+	ctx.JSON(http.StatusOK, gin.H{"user": user})
+}
+
+// Function used to create a new user
 func CreateUser(ctx *gin.Context) {
 	// We create an input and attempt to bind the JSON body
 	var in CreateUserInput
@@ -60,6 +103,7 @@ func CreateUser(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"user": user})
 }
 
+// Function to login a user that has an account
 func Login(ctx *gin.Context) {
 	// We create a credential from our user input and bind the JSON body
 	var cred CreateUserInput
@@ -85,6 +129,7 @@ func Login(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"user": user})
 }
 
+// Function to create a channel
 func CreateChannel(ctx *gin.Context) {
 	// We create an input and attempt to bind the JSON body
 	var in CreateChannelInput
@@ -103,6 +148,7 @@ func CreateChannel(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"channel": channel})
 }
 
+// Function to create a message
 func CreateMessage(ctx *gin.Context) {
 	// We create an input and attempt to bind the JSON body
 	var in CreateMessageInput
@@ -126,7 +172,8 @@ func CreateMessage(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": message})
 }
 
-func FindChannels(ctx *gin.Context) {
+// Function to get our channel names for the front end
+func GetChannels(ctx *gin.Context) {
 	// We create a slice of Channels
 	var channels []models.Channel
 
@@ -137,7 +184,26 @@ func FindChannels(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"channels": channels})
 }
 
-func FindMessages(ctx *gin.Context) {
+// Function to get the channel messages for the front end
+func GetChannelMessages(ctx *gin.Context) {
+	// We query the id
+	// .GET("/users/:id")
+	id := ctx.Param("id")
+
+	// We create a slice of messages
+	var messages []models.Message
+	// We need to query given our ID, we order by ascending order then find
+	// our messages
+	if err := models.DB.Where("channel_id = ?", id).Order("id ASC").Find(&messages).Error; err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	// We can now return our messages
+	ctx.JSON(http.StatusOK, gin.H{"messages": messages})
+}
+
+// Function to get our messages for our front end
+func GetMessages(ctx *gin.Context) {
 	// We create a slice of Messages
 	var messages []models.Message
 
@@ -146,4 +212,16 @@ func FindMessages(ctx *gin.Context) {
 
 	// We return out the proper JSON
 	ctx.JSON(http.StatusOK, gin.H{"messages": messages})
+}
+
+// Function to get our users for the admin page
+func GetUsers(ctx *gin.Context) {
+	// We create a slice of users
+	var users []models.User
+
+	// we then try to find the users
+	models.DB.Find(&users)
+
+	// We return out the proper JSON
+	ctx.JSON(http.StatusOK, gin.H{"users": users})
 }

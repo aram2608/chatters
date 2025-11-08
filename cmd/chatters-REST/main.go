@@ -24,10 +24,12 @@ func main() {
 	r.POST("/channels", controllers.CreateChannel)
 	r.POST("/messages", controllers.CreateMessage)
 
-	// We make two GET requests that can return the list of channels and
+	// We make GET requests that can return the list of channels and
 	// messages from our endpoints
-	r.GET("/channels", controllers.FindChannels)
-	r.GET("/messages", controllers.FindMessages)
+	r.GET("/channels", controllers.GetChannels)
+	r.GET("/channels/:id/messages", controllers.GetChannelMessages)
+	r.GET("/messages", controllers.GetMessages)
+	r.GET("/users", controllers.GetUsers)
 
 	// We make a login endpoint with the proper login handler
 	r.POST("/login", controllers.Login)
